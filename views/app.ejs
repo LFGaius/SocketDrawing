@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title></title>
+    </head>
+    <body>
+        Welcome into the app!
+    </body>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        //let socket=io.connect();
+        let socket = io();
+        socket.emit('clientmessage','Hello Server I am a client!');
+        socket.on('clientmessage',(msg)=>{
+            console.log('Client:I receive a client message!');
+        });
+        socket.on('servermessage',(msg)=>{
+            console.log('Server:'+msg);
+        });
+    </script>
+</html>
