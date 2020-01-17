@@ -2,20 +2,253 @@
 <html>
     <head>
         <title></title>
+        <style type="text/css">
+          canvas { border: 3px solid rgb(177, 177, 177); }
+        </style>  
     </head>
     <body>
-        Welcome into the app!
+        <canvas id="collabdraw" width="500" height="500"></canvas>
+        <div>
+            <table cellspacing="0" padding="0">
+                <tr>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(255, 210, 210)"></div></td >
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(252, 148, 148)"></div></td>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(253, 95, 95)"></div></td>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(255, 41, 41)"></div></td>
+                </tr>
+                <tr>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(252, 253, 183)"></div></td>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(111, 199, 71)"></div></td>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(242, 245, 80)"></div></td>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(216, 20, 20)"></div></td>
+                </tr>
+                <tr>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(117, 19, 117)"></div></td>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(110, 5, 110)"></div></td>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(51, 2, 26)"></div></td>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(177,177,177)"></div></td>
+                </tr>
+                <tr>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(2, 61, 116)"></div></td>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(9, 172, 163)"></div></td>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(87, 109, 6)"></div></td>
+                    <td><div onclick="onPickColor(this)" style="width:30px;height:30px;background:rgb(0, 0, 0)"></div></td>
+                </tr>
+            </table>
+        </div>
+        <div>
+            <input onchange="onSizeChange(this)" type="number" min="1" max="5"/>
+            <button name="pencil" onclick="selectedTool(this)">Pencil</button>
+            <button name="square" onclick="selectedTool(this)">Square</button>
+            <button name="line" onclick="selectedTool(this)">Line</button>
+        </div>
     </body>
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        //let socket=io.connect();
+        
+        let color='rgb(0, 0, 0)';
+        let canvas = document.getElementById("collabdraw");
+        let ctx = canvas.getContext("2d");
         let socket = io();
-        socket.emit('clientmessage','Hello Server I am a client!');
-        socket.on('clientmessage',(msg)=>{
-            console.log('Client:I receive a client message!');
+        let rect = canvas.getBoundingClientRect();
+        let drawing=false;
+        let pencil=false;
+        let square=false;
+        let line=true;
+        let points=[];
+        let squares=[];
+        let lines=[];
+        let ind_current_square=-1;
+        let ind_current_line=-1;
+        let radius=1;
+        let clientkey;
+
+        
+        function selectedTool(e){
+            pencil=false;
+            square=false;
+            line=false;
+            switch(e.name){
+                case 'pencil':
+                    pencil=true;
+                break;
+                case 'square':
+                    square=true;
+                break;
+                case 'line':
+                    line=true;
+                break;
+                default:;
+            }
+        }
+        
+        socket.on('key',(key)=>{debugger
+            clientkey=key;
         });
-        socket.on('servermessage',(msg)=>{
-            console.log('Server:'+msg);
+
+        socket.on('servermessage',(doc)=>{
+            ctx.clearRect(0, 0, 500, 500);
+            doc.forEach(e=>{
+                ctx.beginPath();
+                drawpoints(e.points);
+                drawsquares(e.squares);
+                drawlines(e.lines);
+            })
+            
         });
+
+        
+
+        function onSizeChange(e){
+            radius=e.value<1?1:e.value;
+        }
+
+        function onPickColor(e){debugger
+            color=e.style.background;
+        }
+
+        function drawlines(lns){debugger
+            lns.forEach(ln=>{
+                drawline(ln.x_from,ln.y_from,ln.x_to,ln.y_to,ln.radius,ln.color);
+            });
+            
+        }
+
+        function drawsquares(sqrs){debugger
+            sqrs.forEach(sqr=>{
+                drawsquare(sqr.x_from,sqr.y_from,sqr.width,sqr.height,sqr.radius,sqr.color);
+            });
+            
+        }
+
+        function drawpoints(pts){
+            pts.forEach(p=>{
+                if(!p.break)
+                    drawpoint(p.x,p.y,p.radius,p.color);
+                else
+                    ctx.beginPath();
+            });
+            
+            ctx.beginPath();
+        }
+
+        canvas.addEventListener('mousedown',(event)=>{debugger
+            drawing=true;
+            let x=event.pageX-rect.left;
+            let y=event.pageY-rect.top;
+            if(square){
+                squares.push({x_from:x,y_from:y,width:0,height:0});
+                ind_current_square=squares.length-1;
+            }else if(pencil){
+                points.push({x:x,y:y,radius:radius,color:color,owner:''});
+                //draw();
+            }else if(line){
+                lines.push({x_from:x,y_from:y,x_to:y,y_to:y});
+                ind_current_line=lines.length-1;
+            }
+            
+        });
+
+        canvas.addEventListener('mouseup',(event)=>{
+            drawing=false;
+            points.push({break:true});
+            ctx.beginPath();
+        })
+
+        //canvas.addEventListener('mouseout',(event)=>{
+            //drawing=false;
+            //if(pencil){
+            //    points.push({break:true});
+            //    ctx.beginPath();
+            //}else if(square){
+            //    ind_current_square=-1;
+            //}else if(line){
+            //    ind_current_line=-1;
+            //}
+            
+        //})
+
+        canvas.addEventListener('mousemove',(event)=>{
+            if(drawing){debugger
+                let x=event.pageX-rect.left;
+                let y=event.pageY-rect.top;
+                if(pencil){
+                    //drawpoint(x,y,radius,color);
+                    points.push({x:x,y:y,radius:radius,color:color});
+                }else if(square){
+                    squares[ind_current_square]={...squares[ind_current_square],width:x-squares[ind_current_square].x_from,height:y-squares[ind_current_square].y_from,radius:radius,color:color};
+                }else if(line){
+                    lines[ind_current_line]={...lines[ind_current_line],x_to:x,y_to:y,radius:radius,color:color};
+                }
+                socket.emit('clientmessage',{key:clientkey,points:points,squares:squares,lines:lines});
+            }
+        });
+
+
+        function drawpoint(x,y,radius,color) {
+            ctx.fillStyle =color;
+            ctx.strokeStyle=color;
+            ctx.lineWidth=radius*2;
+            ctx.lineTo(x,y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.lineTo(x,y);
+            ctx.arc(x, y, radius, 0, Math.PI * 2, true);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(x,y);
+        }
+
+        function drawsquare(x_from,y_from,width,height,radius,color) {
+            ctx.fillStyle =color;
+            ctx.strokeStyle=color;
+            ctx.lineWidth=radius*2;
+            ctx.strokeRect(x_from,y_from,width,height);
+        }
+
+        function drawline(x_from,y_from,x_to,y_to,radius,color) {
+            ctx.fillStyle =color;
+            ctx.strokeStyle=color;
+            ctx.lineWidth=radius*2;
+            ctx.beginPath();
+            ctx.moveTo(x_from, y_from);
+            ctx.lineTo(x_to, y_to);
+            ctx.stroke();
+        }
+
+    </script>
+    <script>
+        //ctx.fillStyle = 'rgb(200, 0, 0)';
+            //ctx.fillRect(25, 25, 100, 100);
+            //ctx.clearRect(45, 45, 60, 60);
+            //ctx.strokeRect(50, 50, 50, 50);
+
+            //triangle
+            //ctx.beginPath();
+            //ctx.moveTo(75, 50);
+            //ctx.lineTo(100, 75);
+            //ctx.lineTo(100, 25);
+            //ctx.lineTo(100, 25);
+            //ctx.lineTo(75, 50);
+            //ctx.stroke();
+
+            //ctx.arc(x, y, rayon, angleInitial, angleFinal, antihoraire)
+
+            //ctx.beginPath();
+            //ctx.arc(75, 75, 50, 0, Math.PI * 2, true);  // Cercle extérieur (x-axis,y-axis,radius,?,rotation angle)
+            //ctx.moveTo(110,75);
+            //ctx.arc(75, 75, 35, 0, Math.PI, false);  // Bouche (sens horaire)
+            //ctx.moveTo(65, 65);
+            //ctx.arc(60, 65, 5, 0, Math.PI * 2, true);  // Oeil gauche
+            //ctx.moveTo(95, 65);
+            //ctx.arc(90, 65, 5, 0, Math.PI * 2, true);  // Oeil droite
+            //ctx.stroke();
+
+            //var el = document.getElementById("canvas");
+            //el.addEventListener("touchstart", handleStart, false);
+            //el.addEventListener("touchend", handleEnd, false);
+            //el.addEventListener("touchcancel", handleCancel, false);
+            //el.addEventListener("touchmove", handleMove, false);
     </script>
 </html>
+
